@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.StreamOverlay" parent="android:Theme.Material.NoTitleBar">
-        <item name="android:windowBackground">#121212</item>
-        <item name="android:colorPrimary">#BB86FC</item>
+    <style name="Theme.StreamOverlay" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorPrimary">#BB86FC</item>
         <item name="android:statusBarColor">#121212</item>
+        <item name="android:windowBackground">#121212</item>
     </style>
 </resources>
