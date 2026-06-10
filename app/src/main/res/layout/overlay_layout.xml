@@ -5,7 +5,6 @@
     android:orientation="vertical"
     android:background="#00000000">
 
-    <!-- Barre de contrôle -->
     <LinearLayout
         android:id="@+id/dragHandle"
         android:layout_width="match_parent"
@@ -20,7 +19,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="⠿ Stream Overlay"
+            android:text="Stream Overlay"
             android:textColor="#BB86FC"
             android:textSize="12sp"
             android:textStyle="bold"/>
@@ -29,10 +28,9 @@
             android:id="@+id/btnReload"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="↺"
+            android:text="R"
             android:textColor="#AAAAAA"
             android:background="@null"
-            android:textSize="16sp"
             android:minWidth="0dp"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"/>
@@ -41,10 +39,9 @@
             android:id="@+id/btnSettings"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="⚙"
+            android:text="S"
             android:textColor="#AAAAAA"
             android:background="@null"
-            android:textSize="16sp"
             android:minWidth="0dp"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"/>
@@ -53,44 +50,15 @@
             android:id="@+id/btnClose"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="✕"
+            android:text="X"
             android:textColor="#CF6679"
             android:background="@null"
-            android:textSize="16sp"
             android:minWidth="0dp"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"/>
 
     </LinearLayout>
 
-    <!-- WebView transparent -->
-    <WebView
-        android:id="@+id/webView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#00000000"/>
-
-</LinearLayout>        <ImageButton
-            android:id="@+id/btnSettings"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@android:drawable/ic_menu_manage"
-            android:tint="#AAAAAA"
-            android:contentDescription="Paramètres"/>
-
-        <ImageButton
-            android:id="@+id/btnClose"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@android:drawable/ic_menu_close_clear_cancel"
-            android:tint="#CF6679"
-            android:contentDescription="Fermer"/>
-
-    </LinearLayout>
-
-    <!-- WebView transparent -->
     <WebView
         android:id="@+id/webView"
         android:layout_width="match_parent"
