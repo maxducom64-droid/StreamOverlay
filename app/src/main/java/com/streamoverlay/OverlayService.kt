@@ -7,7 +7,7 @@ import android.graphics.PixelFormat
 import android.os.*
 import android.view.*
 import android.webkit.*
-import android.widget.ImageButton
+import android.widget.Button
 import android.widget.SeekBar
 import androidx.core.app.NotificationCompat
 
@@ -120,23 +120,20 @@ class OverlayService : Service() {
     }
 
     private fun setupControls() {
-        // Bouton fermer
-        overlayView!!.findViewById<ImageButton>(R.id.btnClose).setOnClickListener {
-            stopOverlay()
-        }
+    overlayView!!.findViewById<Button>(R.id.btnClose).setOnClickListener {
+        stopOverlay()
+    }
 
-        // Bouton retour app
-        overlayView!!.findViewById<ImageButton>(R.id.btnSettings).setOnClickListener {
-            val intent = Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-            startActivity(intent)
+    overlayView!!.findViewById<Button>(R.id.btnSettings).setOnClickListener {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
+        startActivity(intent)
+    }
 
-        // Bouton recharger
-        overlayView!!.findViewById<ImageButton>(R.id.btnReload).setOnClickListener {
-            webView?.reload()
-        }
+    overlayView!!.findViewById<Button>(R.id.btnReload).setOnClickListener {
+        webView?.reload()
+    }
     }
 
     private fun setupDragAndResize() {
