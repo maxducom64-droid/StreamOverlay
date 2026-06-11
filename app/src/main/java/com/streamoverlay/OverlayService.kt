@@ -3,12 +3,12 @@ package com.streamoverlay
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.*
 import android.view.*
 import android.webkit.*
 import android.widget.Button
-import android.widget.SeekBar
 import androidx.core.app.NotificationCompat
 
 class OverlayService : Service() {
@@ -26,13 +26,8 @@ class OverlayService : Service() {
     private var overlayView: View? = null
     private var webView: WebView? = null
     private var params: WindowManager.LayoutParams? = null
-
-    // Variables pour le déplacement par drag
-    private var initialX = 0
-    private var initialY = 0
-    private var initialTouchX = 0f
-    private var initialTouchY = 0f
-    private var isDragging = false
+    private var initialX = 0; private var initialY = 0
+    private var initialTouchX = 0f; private var initialTouchY = 0f
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -51,7 +46,7 @@ class OverlayService : Service() {
                 val opacity = intent.getIntExtra("opacity", 90)
                 startOverlay(url, width, height, opacity)
             }
-            ACTION_STOP -> stopOverlay()
+            ACTION_STOP           -> stopOverlay()
             ACTION_UPDATE_OPACITY -> {
                 val opacity = intent.getIntExtra("opacity", 90)
                 overlayView?.alpha = opacity / 100f
@@ -61,11 +56,20 @@ class OverlayService : Service() {
     }
 
     private fun startOverlay(url: String, width: Int, height: Int, opacity: Int) {
-        stopOverlay() // Arrêter l'overlay existant si présent
+        stopOverlay()
 
-        startForeground(NOTIF_ID, buildNotification())
+        // Démarrer en foreground selon la version Android
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIF_ID,
+                buildNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(NOTIF_ID, buildNotification())
+        }
 
-        val inflater = getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
+        val inflater = LayoutInflater.from(this)
         overlayView = inflater.inflate(R.layout.overlay_layout, null)
         overlayView!!.alpha = opacity / 100f
 
@@ -79,12 +83,10 @@ class OverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 10
-            y = 150
+            x = 10; y = 150
         }
 
-        setupDragAndResize()
-
+        setupDrag()
         windowManager.addView(overlayView, params)
         isRunning = true
     }
@@ -92,72 +94,52 @@ class OverlayService : Service() {
     private fun setupWebView(url: String) {
         webView = overlayView!!.findViewById(R.id.webView)
         webView!!.apply {
-            setBackgroundColor(0x00000000) // Transparent
+            setBackgroundColor(0x00000000)
             settings.apply {
-                javaScriptEnabled          = true
-                domStorageEnabled          = true
+                javaScriptEnabled = true
+                domStorageEnabled = true
                 mediaPlaybackRequiresUserGesture = false
-                mixedContentMode           = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                cacheMode                  = WebSettings.LOAD_NO_CACHE
+                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             }
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
-                    // Injecter du CSS pour rendre le fond transparent
                     view?.evaluateJavascript(
-                        """
-                        (function() {
-                            var style = document.createElement('style');
-                            style.innerHTML = 'html, body { background: transparent !important; background-color: transparent !important; }';
-                            document.head.appendChild(style);
-                        })();
-                        """.trimIndent(), null
+                        "document.body.style.background='transparent';" +
+                        "document.documentElement.style.background='transparent';",
+                        null
                     )
                 }
             }
-            webChromeClient = WebChromeClient()
             loadUrl(url)
         }
     }
 
     private fun setupControls() {
-    overlayView!!.findViewById<Button>(R.id.btnClose).setOnClickListener {
-        stopOverlay()
-    }
-
-    overlayView!!.findViewById<Button>(R.id.btnSettings).setOnClickListener {
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        overlayView!!.findViewById<Button>(R.id.btnClose).setOnClickListener {
+            stopOverlay()
         }
-        startActivity(intent)
+        overlayView!!.findViewById<Button>(R.id.btnSettings).setOnClickListener {
+            startActivity(Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            })
+        }
+        overlayView!!.findViewById<Button>(R.id.btnReload).setOnClickListener {
+            webView?.reload()
+        }
     }
 
-    overlayView!!.findViewById<Button>(R.id.btnReload).setOnClickListener {
-        webView?.reload()
-    }
-    }
-
-    private fun setupDragAndResize() {
-        val dragHandle = overlayView!!.findViewById<View>(R.id.dragHandle)
-
-        dragHandle.setOnTouchListener { _, event ->
+    private fun setupDrag() {
+        overlayView!!.findViewById<View>(R.id.dragHandle).setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    initialX      = params!!.x
-                    initialY      = params!!.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    isDragging    = false
+                    initialX = params!!.x; initialY = params!!.y
+                    initialTouchX = event.rawX; initialTouchY = event.rawY
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val dx = event.rawX - initialTouchX
-                    val dy = event.rawY - initialTouchY
-                    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) isDragging = true
-                    if (isDragging) {
-                        params!!.x = initialX + dx.toInt()
-                        params!!.y = initialY + dy.toInt()
-                        windowManager.updateViewLayout(overlayView, params)
-                    }
+                    params!!.x = initialX + (event.rawX - initialTouchX).toInt()
+                    params!!.y = initialY + (event.rawY - initialTouchY).toInt()
+                    windowManager.updateViewLayout(overlayView, params)
                     true
                 }
                 else -> false
@@ -166,51 +148,40 @@ class OverlayService : Service() {
     }
 
     private fun stopOverlay() {
-        overlayView?.let {
-            windowManager.removeView(it)
-            overlayView = null
-        }
-        webView?.destroy()
-        webView = null
+        overlayView?.let { windowManager.removeView(it); overlayView = null }
+        webView?.destroy(); webView = null
         isRunning = false
-        stopForeground(true)
+        stopForeground(STOP_FOREGROUND_REMOVE)
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Stream Overlay",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply { description = "Overlay Tikfinity actif" }
-            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
-                .createNotificationChannel(channel)
-        }
+        val channel = NotificationChannel(
+            CHANNEL_ID, "Stream Overlay",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply { description = "Overlay actif" }
+        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
+            .createNotificationChannel(channel)
     }
 
     private fun buildNotification(): Notification {
-        val stopIntent = Intent(this, OverlayService::class.java).apply {
-            action = ACTION_STOP
-        }
-        val stopPending = PendingIntent.getService(
-            this, 0, stopIntent,
+        val stopIntent = PendingIntent.getService(
+            this, 0,
+            Intent(this, OverlayService::class.java).apply { action = ACTION_STOP },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
-        val openIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        val openPending = PendingIntent.getActivity(
-            this, 0, openIntent,
+        val openIntent = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle("Stream Overlay actif")
-            .setContentText("Tikfinity overlay en cours")
-            .setContentIntent(openPending)
-            .addAction(android.R.drawable.ic_delete, "Arrêter", stopPending)
+            .setContentText("Tap pour ouvrir")
+            .setContentIntent(openIntent)
+            .addAction(android.R.drawable.ic_delete, "Arrêter", stopIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
