@@ -14,17 +14,19 @@ import androidx.core.app.NotificationCompat
 class OverlayService : Service() {
 
     companion object {
-        const val ACTION_START          = "ACTION_START"
-        const val ACTION_STOP           = "ACTION_STOP"
-        const val ACTION_UPDATE_OPACITY = "ACTION_UPDATE_OPACITY"
-        const val CHANNEL_ID            = "StreamOverlayChannel"
-        const val NOTIF_ID              = 1
-        var isRunning = false
+        const val ACTION_START            = "ACTION_START"
+        const val ACTION_STOP             = "ACTION_STOP"
+        const val ACTION_UPDATE_OPACITY   = "ACTION_UPDATE_OPACITY"
+        const val ACTION_TOGGLE_CLICKTHROUGH = "ACTION_TOGGLE_CLICKTHROUGH"
+        const val CHANNEL_ID              = "StreamOverlayChannel"
+        const val NOTIF_ID                = 1
+        var isRunning     = false
+        var isClickThrough = true
     }
 
     private lateinit var windowManager: WindowManager
     private var overlayView: View? = null
-    private var webView: WebView? = null
+    private var webView: WebView?  = null
     private var params: WindowManager.LayoutParams? = null
     private var initialX = 0; private var initialY = 0
     private var initialTouchX = 0f; private var initialTouchY = 0f
@@ -46,19 +48,43 @@ class OverlayService : Service() {
                 val opacity = intent.getIntExtra("opacity", 90)
                 startOverlay(url, width, height, opacity)
             }
-            ACTION_STOP           -> stopOverlay()
-            ACTION_UPDATE_OPACITY -> {
+            ACTION_STOP             -> stopOverlay()
+            ACTION_UPDATE_OPACITY   -> {
                 val opacity = intent.getIntExtra("opacity", 90)
                 overlayView?.alpha = opacity / 100f
             }
+            ACTION_TOGGLE_CLICKTHROUGH -> toggleClickThrough()
         }
         return START_STICKY
+    }
+
+    private fun buildFlags(): Int {
+        return if (isClickThrough) {
+            // Click-through : les touches passent au travers
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+        } else {
+            // Interactif : on peut glisser et appuyer sur les boutons
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+        }
+    }
+
+    private fun toggleClickThrough() {
+        isClickThrough = !isClickThrough
+        params?.flags = buildFlags()
+        overlayView?.let {
+            windowManager.updateViewLayout(it, params)
+        }
+        // Mettre à jour la notification pour refléter l'état
+        val notifManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        notifManager.notify(NOTIF_ID, buildNotification())
     }
 
     private fun startOverlay(url: String, width: Int, height: Int, opacity: Int) {
         stopOverlay()
 
-        // Démarrer en foreground selon la version Android
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 NOTIF_ID,
@@ -68,6 +94,8 @@ class OverlayService : Service() {
         } else {
             startForeground(NOTIF_ID, buildNotification())
         }
+
+        isClickThrough = true // Click-through activé par défaut au démarrage
 
         val inflater = LayoutInflater.from(this)
         overlayView = inflater.inflate(R.layout.overlay_layout, null)
@@ -79,7 +107,7 @@ class OverlayService : Service() {
         params = WindowManager.LayoutParams(
             width, height,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            buildFlags(),
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -169,6 +197,13 @@ class OverlayService : Service() {
             Intent(this, OverlayService::class.java).apply { action = ACTION_STOP },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val toggleIntent = PendingIntent.getService(
+            this, 1,
+            Intent(this, OverlayService::class.java).apply {
+                action = ACTION_TOGGLE_CLICKTHROUGH
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val openIntent = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java).apply {
@@ -176,13 +211,18 @@ class OverlayService : Service() {
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+
+        val toggleLabel = if (isClickThrough) "🖱 Activer contrôles" else "🎮 Click-through"
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle("Stream Overlay actif")
-            .setContentText("Tap pour ouvrir")
+            .setContentText(if (isClickThrough) "Mode : click-through ✅" else "Mode : interactif 🖱")
             .setContentIntent(openIntent)
+            .addAction(android.R.drawable.ic_menu_view, toggleLabel, toggleIntent)
             .addAction(android.R.drawable.ic_delete, "Arrêter", stopIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
             .build()
     }
 
